@@ -5,7 +5,7 @@ import processing.video.*;
 
 final boolean MARKER_TRACKER_DEBUG = true;
 
-final boolean USE_SAMPLE_IMAGE = false;
+final boolean USE_SAMPLE_IMAGE = true;
 
 // We've found that some Windows build-in cameras (e.g. Microsoft Surface)
 // cannot work with processing.video.Capture.*.
@@ -80,6 +80,9 @@ void draw() {
   }
 
   markerTracker.findMarker(markers);
+
+  System.gc();
+
 }
 
 void captureEvent(Capture c) {

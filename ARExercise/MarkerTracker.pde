@@ -65,6 +65,27 @@ class MarkerTracker {
         println("Finished");
     }
 
+
+    int subpixSampleSafe(Mat pSrc, PVector p){
+        int x = (int)(floor(p.x));
+        int y = (int)(floor(p.y));
+
+        if(x < 0 || x >= pSrc.cols() - 1 || y < 0 || y >= pSrc.rows() - 1) return 127;
+
+        int dx = (int)(256 * (p.x - floor(p.x)));
+        int dy = (int)(256 * (p.y - floor(p.y)));
+
+        int i = (int)(pSrc.get(y, x)[0]);
+        int ix = (int)(pSrc.get(y, x+1)[0]);
+        int iy = (int)(pSrc.get(y+1, x)[0]);
+        int ixy = (int)(pSrc.get(y+1, x+1)[0]);
+
+        int a = i + ((dx * (ix - i)) >> 8);
+        int b = iy + ((dx * (ixy - iy)) >> 8);
+
+        return a + ((dy * (b - a)) >> 8);
+    }
+
 	void findMarker(ArrayList<Marker> markers) {
         boolean isFirstStripe = true;
         boolean isFirstMarker = true;
@@ -130,24 +151,106 @@ class MarkerTracker {
             }
             endShape(CLOSE);
 
+            int kNumOfEdgepoints = 7;
+
             // circles on vertex and edge
-            for (int i = 0; i < 4; i++){
+            for (int i = 0; i < kNumOfCorners; i++){
                 // vertex
                 stroke(200, 0, 0);
                 fill(200, 0, 0);
                 circle((float)p[i].x, (float)p[i].y, kCircleSize);
 
-                // edge
-                for(int j = 1; j < 7; j++){
-                    Point edge_point = new Point();
-                    edge_point.x = p[i%4].x*j/7 + p[(i+1)%4].x*(7-j)/7;
-                    edge_point.y = p[i%4].y*j/7 + p[(i+1)%4].y*(7-j)/7;
+                Point[] approx_points = contour_approx.toArray();
+                PVector pa = OpenCV.pointToPVector(approx_points[(i+1)%kNumOfCorners]);
+                PVector pb = OpenCV.pointToPVector(approx_points[i]);
+                PVector kEdgeDirectionVec = PVector.div(PVector.sub(pa, pb), kNumOfEdgepoints);
+                float kEdgeDirectionVecNorm = kEdgeDirectionVec.mag();
+
+                // stripe size
+                int stripe_length = (int)(0.4 * kEdgeDirectionVecNorm);
+                if(stripe_length < 5) stripe_length = 5;
+                stripe_length |= 1; // make odd
+
+
+                int kStop = stripe_length >> 1; //floor(stripe_length/2);
+                int kSrart = -kStop;
+                int kStripeWidth = 3;
+                Size kStripeSize = new Size(kStripeWidth, stripe_length);
+                println(stripe_length);
+
+                //Direction vectors
+                PVector kStripeVecX = PVector.div(kEdgeDirectionVec, kEdgeDirectionVecNorm);
+                PVector kStripeVecY = new PVector(-kStripeVecX.y, kStripeVecX.x);
+
+                // edge, for each stripe
+                for(int j = 1; j < kNumOfEdgepoints; j++){
+                    PVector edge_point = PVector.add(pb, PVector.mult(kEdgeDirectionVec, j));
                     stroke(40, 90, 216);
-                    fill(40, 90, 216);
+                    strokeWeight(kStripeWidth);
+                    // fill(40, 90, 216);
                     circle((float)edge_point.x, (float)edge_point.y, (float)line_width);
+
+                    line(edge_point.x + (-stripe_length)*kStripeVecY.x,
+                    edge_point.y + (-stripe_length)*kStripeVecY.y,
+                    edge_point.x + (stripe_length)*kStripeVecY.x,
+                    edge_point.y + (stripe_length)*kStripeVecY.y);
+
+                    // generating stripe matrix
+                    Mat stripe_image = new Mat(kStripeSize, CvType.CV_8UC1);
+                    for (int m = -1; m <= 1; m++){
+                        // stripe length
+                        for (int n = kSrart; n <= kStop; n++){
+                            PVector subpixel = PVector.add(
+                                PVector.add(edge_point, PVector.mult(kStripeVecX, m)),
+                                PVector.mult(kStripeVecY, n)
+                            );
+
+                            // fetch subpixel value
+                            int kSubpixelValue = subpixSampleSafe(image_gray, subpixel);
+                            int kStripeX = m + 1;
+                            int kStripeY = n + (stripe_length >> 1);
+                            stripe_image.put(kStripeY, kStripeX, kSubpixelValue);
+                        }
+                    }
+
+                    // use sobel operator on stripe
+                    double[] sobel_values = new double[stripe_length - 2];
+                    double sobel_max = 0;
+                    int idx_max = -1;
+
+                    for (int n = 1; n < stripe_length - 1; n++){
+                        byte[] pbyte = new byte[3];
+                        stripe_image.get(n - 1, 0, pbyte);
+                        double r1 = -(pbyte[0] & 0xFF) - 2.0 * (pbyte[1] & 0xFF) - (pbyte[2] & 0xFF);
+
+                        stripe_image.get(n + 1, 0, pbyte);
+                        double r3 = (pbyte[0] & 0xFF) + 2.0 * (pbyte[1] & 0xFF) + (pbyte[2] & 0xFF);
+
+                        sobel_values[n-1] = -(r1 + r3);
+                        if(sobel_max < sobel_values[n-1]){
+                            sobel_max = sobel_values[n-1];
+                            idx_max = n-1;
+                        }
+                    }
+
+                    double pos;
+
+                    // parabolic curve
+                    if(idx_max == 0 || idx_max == sobel_values.length - 1){
+                        pos = sobel_values[idx_max];
+                    }else{
+                        pos = (sobel_values[idx_max+1] - sobel_values[idx_max-1]) / (4 * sobel_values[idx_max] - 2 * sobel_values[idx_max-1] - 2 * sobel_values[idx_max+1]);
+                    }
+
                 }
 
+                
 
+
+
+
+
+                
             }
         }
 
