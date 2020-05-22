@@ -233,14 +233,17 @@ class MarkerTracker {
                         }
                     }
 
-                    double pos;
+                    double pos, y0, y1, y2;
+                    y0 = (idx_max <= 0) ? 0: sobel_values[idx_max-1]
+                    y1 = sobel_values[idx_max];
+                    y2 = (idx_max >= stripe-3) ? 0 : sobel_values[idx_max+1];
 
                     // parabolic curve
-                    if(idx_max == 0 || idx_max == sobel_values.length - 1){
-                        pos = sobel_values[idx_max];
-                    }else{
-                        pos = (sobel_values[idx_max+1] - sobel_values[idx_max-1]) / (4 * sobel_values[idx_max] - 2 * sobel_values[idx_max-1] - 2 * sobel_values[idx_max+1]);
-                    }
+                    pos = (y2 - y0) / (4 * y1 - 2 * y0 - 2 * y2);
+
+                    int max_idxshift = idx_max - (stripe_length >> 1);
+                    PVector edge_center = PVector.add(edge_point, PVector.mult(kStripeVecY, max_idxshift + (float)pos))
+                    
 
                 }
 
