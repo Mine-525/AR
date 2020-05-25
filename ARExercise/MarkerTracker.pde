@@ -86,6 +86,14 @@ class MarkerTracker {
         return a + ((dy * (b - a)) >> 8);
     }
 
+    Point[] Pvec2Parray(PVector[] v){
+        Point[] p = new Point[v.length];
+        for (int i = 0; i < v.length; i++){
+            p[i] = new Point(v[i].x, v[i].y);
+        }
+        return p;
+    }
+
 	void findMarker(ArrayList<Marker> markers) {
         boolean isFirstStripe = true;
         boolean isFirstMarker = true;
