@@ -160,6 +160,7 @@ class MarkerTracker {
             endShape(CLOSE);
 
             int kNumOfEdgepoints = 7;
+            Mat[] line_parameters = new Mat[kNumOfCorners];
 
             // circles on vertex and edge
             for (int i = 0; i < kNumOfCorners; i++){
@@ -184,11 +185,13 @@ class MarkerTracker {
                 int kSrart = -kStop;
                 int kStripeWidth = 3;
                 Size kStripeSize = new Size(kStripeWidth, stripe_length);
-                println(stripe_length);
 
                 //Direction vectors
                 PVector kStripeVecX = PVector.div(kEdgeDirectionVec, kEdgeDirectionVecNorm);
                 PVector kStripeVecY = new PVector(-kStripeVecX.y, kStripeVecX.x);
+
+                PVector[] edge_points = new PVector[kNumOfEdgepoints-1];
+                Mat[] lines = new Mat[kNumOfCorners];
 
                 // edge, for each stripe
                 for(int j = 1; j < kNumOfEdgepoints; j++){
@@ -242,27 +245,31 @@ class MarkerTracker {
                     }
 
                     double pos, y0, y1, y2;
-                    y0 = (idx_max <= 0) ? 0: sobel_values[idx_max-1]
+                    y0 = (idx_max <= 0) ? 0: sobel_values[idx_max-1];
                     y1 = sobel_values[idx_max];
-                    y2 = (idx_max >= stripe-3) ? 0 : sobel_values[idx_max+1];
+                    y2 = (idx_max >= stripe_length-3) ? 0 : sobel_values[idx_max+1];
 
                     // parabolic curve
                     pos = (y2 - y0) / (4 * y1 - 2 * y0 - 2 * y2);
 
                     int max_idxshift = idx_max - (stripe_length >> 1);
-                    PVector edge_center = PVector.add(edge_point, PVector.mult(kStripeVecY, max_idxshift + (float)pos))
                     
+                    edge_points[j-1] = PVector.add(edge_point, PVector.mult(kStripeVecY, max_idxshift + (float)pos));
 
                 }
 
-                
+                MatOfPoint2f mat = new MatOfPoint2f();
 
+                // convert edge point to mat
+                mat.fromArray(Pvec2Parray(edge_points));
 
-
-
-
-                
+                // fit line
+                line_parameters[i] = new Mat();
+                Imgproc.fitLine(mat, line_parameters[i], Imgproc.CV_DIST_L2, 0, 0.01, 0.01);
             }
+
+            // compute corners as intersections of sides
+            
         }
 
 
