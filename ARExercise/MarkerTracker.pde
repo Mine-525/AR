@@ -17,9 +17,13 @@ import org.opencv.core.Rect;
 class Marker {
     int code;
     float[] pose;
+    Mat mark_image;
+    Mat transform;
 
     Marker() {
         pose = new float[16];
+        mark_image = new Mat(kNumMarkerPxl, kNumMarkerPxl, CvType.CV_8UC1);
+        transform = new Mat(3, 3, CvType.CV_64FC1);
     }
 
     void print_matrix() {
@@ -42,6 +46,8 @@ class MarkerTracker {
     Mat image_bgr;
 	Mat image_gray;
 	Mat image_gray_filtered;
+
+    ArrayList<Marker> marker_list = new ArrayList<Marker>(); // list for detected markers
 
     MarkerTracker(double _kMarkerSizeLength) {
         thresh = 80;
@@ -307,6 +313,34 @@ class MarkerTracker {
                 circle((float)intersections[i].x, (float)intersections[i].y, kCircleSize);
             }
 
+            // setting src image position for transform
+            double src_point[] = new double[2*kNumOfCorners];
+            for(int i = 0; i < kNumOfCorners; i++){
+                src_point[2*i] = intersections[i].x;
+                src_point[2*i+1] = intersections[i].y;
+            }
+
+            Mat src_point_mat = new Mat(4, 2, CvType.CV_32FC1);
+            src_point_mat.put(0, 0, src_point);
+            // println(src_point_mat.dump());
+
+            // setting dst image position for transform
+            double dst_point[] = new double[]{0, 0, 0, 200, 200, 200, 200, 0};
+            Mat dst_point_mat = new Mat(4, 2, CvType.CV_32FC1);
+            dst_point_mat.put(0, 0, dst_point);
+            // println(dst_point_mat.dump());
+
+
+            Marker marker = new Marker();
+            marker.transform = Imgproc.getPerspectiveTransform(src_point_mat, dst_point_mat);
+            // println(marker.transform.dump());
+            Imgproc.warpPerspective(image_gray, marker.mark_image, marker.transform, new Size((double)kNumMarkerPxl, (double)kNumMarkerPxl));
+            marker_list.add(marker);
+            if(!check_ID){
+                check_ID = true;
+            }
+            Imgproc.threshold(marker.mark_image, marker.mark_image, bw_thresh, 255.0, Imgproc.THRESH_BINARY);
+            
         }
 
 
