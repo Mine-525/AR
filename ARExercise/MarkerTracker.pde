@@ -37,6 +37,8 @@ class Marker {
 }
 
 class MarkerTracker {
+    boolean check_ID = false;
+
     int thresh;     // Threshold: gray to mono
     int bw_thresh;  // Threshold for gray marker to ID image
     double kMarkerSizeLength;
@@ -125,6 +127,16 @@ class MarkerTracker {
         return intersections;
     }
 
+    void showID(){
+        if(check_ID){
+            PImage mini_ID = createImage(200, 200, ARGB);
+            Marker marker_1st = marker_list.get(0);
+            opencv.toPImage(marker_1st.mark_image, mini_ID);
+            System.out.println(marker_1st.mark_image.dump());
+            image(mini_ID, 0, 0);
+        }
+    }
+
 
 
 	void findMarker(ArrayList<Marker> markers) {
@@ -160,6 +172,7 @@ class MarkerTracker {
         // Thresholding and find contour
         Imgproc.threshold(image_gray, image_gray_filtered, thresh, 255.0, Imgproc.THRESH_BINARY);
         Imgproc.findContours(image_gray_filtered, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
+
 
         // Marker detection
         for (MatOfPoint contour : contours){

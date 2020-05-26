@@ -14,8 +14,9 @@ final boolean USE_DIRECTSHOW = false;
 
 final double kMarkerSize = 0.03; // [m]
 final int thresh = 70;
-final int bw_thresh = 70;
+final int bw_thresh = 170;
 final int kNumOfCorners = 4;
+final int kNumMarkerPxl = 200;
 
 Capture cam;
 OpenCV opencv;
@@ -67,6 +68,13 @@ void setup() {
 
   smooth();
   markerTracker = new MarkerTracker(kMarkerSize, thresh, bw_thresh);
+
+  // サブウィンドウの位置を指定する
+  String[] args = {"SecondApplet"};
+  
+  // サブウィンドウを開く
+  SecondApplet sa = new SecondApplet();
+  PApplet.runSketch(args, sa);
   
 }
 
@@ -89,3 +97,24 @@ void captureEvent(Capture c) {
   if (!USE_DIRECTSHOW && c.available())
       c.read();
 }
+
+public class SecondApplet extends PApplet {
+
+  void settings(){
+    size(kNumMarkerPxl, kNumMarkerPxl);
+  }
+  void setup(){
+
+  }
+  void draw(){
+
+    if(markerTracker.check_ID){
+      PImage mini_ID = createImage(kNumMarkerPxl, kNumMarkerPxl, ARGB);
+      Marker marker_1st = markerTracker.marker_list.get(0);
+      opencv.toPImage(marker_1st.mark_image, mini_ID);
+      image(mini_ID, 0, 0);
+    }
+  }
+
+}
+
