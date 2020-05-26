@@ -108,11 +108,12 @@ public class SecondApplet extends PApplet {
   }
   void draw(){
 
-    if(markerTracker.check_ID){
+    if(markerTracker.marker_list.size() != 0){
       PImage mini_ID = createImage(kNumMarkerPxl, kNumMarkerPxl, ARGB);
       Marker marker_1st = markerTracker.marker_list.get(0);
       opencv.toPImage(marker_1st.mark_image, mini_ID);
       image(mini_ID, 0, 0);
+      // markerTracker.marker_list.clear();
     }
   }
 

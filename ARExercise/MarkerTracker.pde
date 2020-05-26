@@ -335,29 +335,25 @@ class MarkerTracker {
 
             Mat src_point_mat = new Mat(4, 2, CvType.CV_32FC1);
             src_point_mat.put(0, 0, src_point);
-            // println(src_point_mat.dump());
 
             // setting dst image position for transform
             double dst_point[] = new double[]{0, 0, 0, 200, 200, 200, 200, 0};
             Mat dst_point_mat = new Mat(4, 2, CvType.CV_32FC1);
             dst_point_mat.put(0, 0, dst_point);
-            // println(dst_point_mat.dump());
 
 
             Marker marker = new Marker();
             marker.transform = Imgproc.getPerspectiveTransform(src_point_mat, dst_point_mat);
-            // println(marker.transform.dump());
             Imgproc.warpPerspective(image_gray, marker.mark_image, marker.transform, new Size((double)kNumMarkerPxl, (double)kNumMarkerPxl));
-            marker_list.add(marker);
-            if(!check_ID){
-                check_ID = true;
-            }
-            Imgproc.threshold(marker.mark_image, marker.mark_image, bw_thresh, 255.0, Imgproc.THRESH_BINARY);
             
+            Imgproc.threshold(marker.mark_image, marker.mark_image, bw_thresh, 255.0, Imgproc.THRESH_BINARY);
+            marker_list.add(marker);
         }
 
 
 
         
+        
+        marker_list.clear();
     }
 }
