@@ -16,7 +16,8 @@ final double kMarkerSize = 0.03; // [m]
 final int thresh = 70;
 final int bw_thresh = 170;
 final int kNumOfCorners = 4;
-final int kNumMarkerPxl = 200;
+final int kNumMarkerPxl = 210;
+final int kNumMarkRange = 5;
 
 Capture cam;
 OpenCV opencv;
@@ -113,7 +114,6 @@ public class SecondApplet extends PApplet {
       Marker marker_1st = markerTracker.marker_list.get(0);
       opencv.toPImage(marker_1st.marker_image, mini_ID);
       image(mini_ID, 0, 0);
-      markerTracker.marker_list.clear();
     }
   }
 

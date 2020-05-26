@@ -19,9 +19,10 @@ class Marker {
     float[] pose;
     Mat marker_image;
     Mat transform;
+    int ID;
 
     Marker() {
-        pose = new float[16];
+        pose = new float[25];
         marker_image = new Mat(kNumMarkerPxl, kNumMarkerPxl, CvType.CV_8UC1);
         transform = new Mat(3, 3, CvType.CV_64FC1);
     }
@@ -53,7 +54,7 @@ class MarkerTracker {
 
     MarkerTracker(double _kMarkerSizeLength) {
         thresh = 80;
-        bw_thresh = 100;
+        bw_thresh = 150;
         kMarkerSizeLength = _kMarkerSizeLength;
         init();
     }
@@ -127,16 +128,28 @@ class MarkerTracker {
         return intersections;
     }
 
-    void showID(){
-        if(check_ID){
-            PImage mini_ID = createImage(200, 200, ARGB);
-            Marker marker_1st = marker_list.get(0);
-            opencv.toPImage(marker_1st.marker_image, mini_ID);
-            System.out.println(marker_1st.marker_image.dump());
-            image(mini_ID, 0, 0);
-        }
-    }
 
+    int get_ID(Marker marker){
+        int ID = 0;
+        int sec_size = marker.marker_image.rows()/(kNumMarkRange+2);
+        Mat image_refine = new Mat(kNumMarkRange, kNumMarkRange, CvType.CV_8UC1);
+
+        for (int i = 1; i <= kNumMarkRange; i++){
+            for(int j = 1; j <= kNumMarkRange; j++){
+                Mat submat = marker.marker_image.submat(sec_size * j + 10, sec_size * (j+1)-10, sec_size * i+10, sec_size * (i+1)-10);
+                double sum = Core.sumElems(submat).val[0];
+                int ave = (int)(sum / (10 * 10));
+                
+                if(ave >= 80){
+                    image_refine.put(i-1, j-1, 0);
+                }else{
+                    image_refine.put(i-1, j-1, 1);
+                }
+            }
+        }
+        System.out.println(image_refine.dump());
+        return ID;
+    }
 
 
 
@@ -349,8 +362,9 @@ class MarkerTracker {
             
             Imgproc.threshold(marker.marker_image, marker.marker_image, bw_thresh, 255.0, Imgproc.THRESH_BINARY);
             marker_list.add(marker);
-        }
 
+            marker.ID = get_ID(marker);
+        }
 
 
         
