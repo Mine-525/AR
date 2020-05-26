@@ -94,6 +94,33 @@ class MarkerTracker {
         return p;
     }
 
+    Point[] get_intersect(Mat[] line){
+        Point[] intersections = new Point[kNumOfCorners];
+        // get line parameters
+        double[][] line_params = new double[kNumOfCorners][3];
+        for (int i = 0; i < kNumOfCorners; i++){
+            // System.out.println(line[i].dump());
+            double vx = line[i].get(0,0)[0], vy = line[i].get(1,0)[0], x0 = line[i].get(2,0)[0], y0 = line[i].get(3,0)[0];
+            line_params[i][0] = -vy;
+            line_params[i][1] = vx;
+            line_params[i][2] = vx * y0 - vy * x0;
+
+        }
+
+        // compute intersects
+        for (int i = 0; i < kNumOfCorners; i++){
+            double a = line_params[i][0], b = line_params[i][1], e = line_params[i][2];
+            double c = line_params[(i+1)%4][0], d = line_params[(i+1)%4][1], f = line_params[(i+1)%4][2];
+
+            double x = (d * e - b * f) / (a * d - b * c), y = (a * f - e * c) / (a * d - b * c);
+            intersections[i] = new Point(x, y);
+        }
+
+        return intersections;
+    }
+
+
+
 	void findMarker(ArrayList<Marker> markers) {
         boolean isFirstStripe = true;
         boolean isFirstMarker = true;
@@ -269,7 +296,9 @@ class MarkerTracker {
             }
 
             // compute corners as intersections of sides
-            
+            Point[] intersections = new Point[kNumOfCorners];
+            intersections = get_intersect(line_parameters);
+
         }
 
 
