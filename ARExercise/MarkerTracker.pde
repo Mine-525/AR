@@ -192,10 +192,6 @@ class MarkerTracker {
             // circles on vertex and edge
             for (int i = 0; i < kNumOfCorners; i++){
                 // vertex
-                stroke(200, 0, 0);
-                fill(200, 0, 0);
-                circle((float)p[i].x, (float)p[i].y, kCircleSize);
-
                 Point[] approx_points = contour_approx.toArray();
                 PVector pa = OpenCV.pointToPVector(approx_points[(i+1)%kNumOfCorners]);
                 PVector pb = OpenCV.pointToPVector(approx_points[i]);
@@ -293,11 +289,23 @@ class MarkerTracker {
                 // fit line
                 line_parameters[i] = new Mat();
                 Imgproc.fitLine(mat, line_parameters[i], Imgproc.CV_DIST_L2, 0, 0.01, 0.01);
+
+                // double vx = line_parameters[i].get(0,0)[0], vy = line_parameters[i].get(1,0)[0], x0 = line_parameters[i].get(2,0)[0], y0 = line_parameters[i].get(3,0)[0];
+                // double lefty = ((-x0*vy/vx) + y0);
+                // double righty = (((image_width-x0)*vy/vx)+y0);
+
+                // line((float)(image_width-1), (float)righty, (float)0, (float)lefty);
             }
 
             // compute corners as intersections of sides
             Point[] intersections = new Point[kNumOfCorners];
             intersections = get_intersect(line_parameters);
+            
+            stroke(200, 0, 0);
+            fill(200, 0, 0);
+            for (int i = 0; i < kNumOfCorners; i++){
+                circle((float)intersections[i].x, (float)intersections[i].y, kCircleSize);
+            }
 
         }
 
