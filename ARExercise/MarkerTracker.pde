@@ -17,12 +17,12 @@ import org.opencv.core.Rect;
 class Marker {
     int code;
     float[] pose;
-    Mat mark_image;
+    Mat marker_image;
     Mat transform;
 
     Marker() {
         pose = new float[16];
-        mark_image = new Mat(kNumMarkerPxl, kNumMarkerPxl, CvType.CV_8UC1);
+        marker_image = new Mat(kNumMarkerPxl, kNumMarkerPxl, CvType.CV_8UC1);
         transform = new Mat(3, 3, CvType.CV_64FC1);
     }
 
@@ -131,11 +131,12 @@ class MarkerTracker {
         if(check_ID){
             PImage mini_ID = createImage(200, 200, ARGB);
             Marker marker_1st = marker_list.get(0);
-            opencv.toPImage(marker_1st.mark_image, mini_ID);
-            System.out.println(marker_1st.mark_image.dump());
+            opencv.toPImage(marker_1st.marker_image, mini_ID);
+            System.out.println(marker_1st.marker_image.dump());
             image(mini_ID, 0, 0);
         }
     }
+
 
 
 
@@ -344,9 +345,9 @@ class MarkerTracker {
 
             Marker marker = new Marker();
             marker.transform = Imgproc.getPerspectiveTransform(src_point_mat, dst_point_mat);
-            Imgproc.warpPerspective(image_gray, marker.mark_image, marker.transform, new Size((double)kNumMarkerPxl, (double)kNumMarkerPxl));
+            Imgproc.warpPerspective(image_gray, marker.marker_image, marker.transform, new Size((double)kNumMarkerPxl, (double)kNumMarkerPxl));
             
-            Imgproc.threshold(marker.mark_image, marker.mark_image, bw_thresh, 255.0, Imgproc.THRESH_BINARY);
+            Imgproc.threshold(marker.marker_image, marker.marker_image, bw_thresh, 255.0, Imgproc.THRESH_BINARY);
             marker_list.add(marker);
         }
 
