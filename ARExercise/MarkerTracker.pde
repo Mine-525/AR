@@ -108,7 +108,6 @@ class MarkerTracker {
         // get line parameters
         double[][] line_params = new double[kNumOfCorners][3];
         for (int i = 0; i < kNumOfCorners; i++){
-            // System.out.println(line[i].dump());
             double vx = line[i].get(0,0)[0], vy = line[i].get(1,0)[0], x0 = line[i].get(2,0)[0], y0 = line[i].get(3,0)[0];
             line_params[i][0] = -vy;
             line_params[i][1] = vx;
@@ -130,10 +129,11 @@ class MarkerTracker {
 
 
     int get_ID(Marker marker){
-        int ID = 0;
+        int ID = (int)1e9;
         int sec_size = marker.marker_image.rows()/(kNumMarkRange+2);
         Mat image_refine = new Mat(kNumMarkRange, kNumMarkRange, CvType.CV_8UC1);
 
+        // get small marker image
         for (int i = 1; i <= kNumMarkRange; i++){
             for(int j = 1; j <= kNumMarkRange; j++){
                 Mat submat = marker.marker_image.submat(sec_size * j + 10, sec_size * (j+1)-10, sec_size * i+10, sec_size * (i+1)-10);
@@ -148,7 +148,40 @@ class MarkerTracker {
             }
         }
         System.out.println(image_refine.dump());
+
+        // calculate ID from eacn direction and select the smallest one
+        int base = (int)Math.pow(2, image_refine.rows()); // for convert id
+        
+        for (int i = 0; i < 4; i++){
+            int id = 0;
+            for (int j = 0; j < image_refine.rows(); j++){
+                int row = 0;
+                for (int k = 0; k < image_refine.cols(); k++){
+                    // println(Math.pow(2, image_refine.cols()-1-k));
+                    row = row + (int)image_refine.get(j, k)[0] * (int)Math.pow(2, image_refine.cols()-1-k);
+                }
+                id = id + row * (int)Math.pow(base, image_refine.rows()-1-j);
+            }
+
+            if(id < ID) ID = id;
+            image_refine = rotate_mat(image_refine);
+        }
+
+        System.out.println(ID);
+
+
         return ID;
+    }
+
+    Mat rotate_mat(Mat mat){
+        Mat mat_rot = new Mat(mat.cols(), mat.rows(), mat.type());
+
+        for(int i = 0; i < mat.rows(); i++){
+            for(int j = 0; j < mat.cols(); j++){
+                mat_rot.put(j, (mat_rot.cols() - 1) - i, mat.get(i, j));
+            }
+        }
+        return mat_rot;
     }
 
 
@@ -323,6 +356,7 @@ class MarkerTracker {
                 line_parameters[i] = new Mat();
                 Imgproc.fitLine(mat, line_parameters[i], Imgproc.CV_DIST_L2, 0, 0.01, 0.01);
 
+                // // display modified line
                 // double vx = line_parameters[i].get(0,0)[0], vy = line_parameters[i].get(1,0)[0], x0 = line_parameters[i].get(2,0)[0], y0 = line_parameters[i].get(3,0)[0];
                 // double lefty = ((-x0*vy/vx) + y0);
                 // double righty = (((image_width-x0)*vy/vx)+y0);
@@ -361,9 +395,13 @@ class MarkerTracker {
             Imgproc.warpPerspective(image_gray, marker.marker_image, marker.transform, new Size((double)kNumMarkerPxl, (double)kNumMarkerPxl));
             
             Imgproc.threshold(marker.marker_image, marker.marker_image, bw_thresh, 255.0, Imgproc.THRESH_BINARY);
+
+            // get ID of marker
+            marker.ID = get_ID(marker);
             marker_list.add(marker);
 
-            marker.ID = get_ID(marker);
+
+            
         }
 
 
