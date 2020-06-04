@@ -16,41 +16,35 @@ import org.opencv.core.Rect;
 
 class Marker {
     int code;
-    float[] pose;
+    PMatrix3D pose;
     Mat marker_image;
     Mat transform;
-    int ID;
+    int id;
 
     Marker() {
-        pose = new float[25];
+        pose = new PMatrix3D();
         marker_image = new Mat(kNumMarkerPxl, kNumMarkerPxl, CvType.CV_8UC1);
         transform = new Mat(3, 3, CvType.CV_64FC1);
     }
 
     void print_matrix() {
-        int kSize = 4;
-        for (int r = 0; r < kSize; r++) {
-            for (int c = 0; c < kSize; c++) {
-                println(pose[r + kSize * (c - 1)]);
-            }
-        }
+        pose.print();
     }
 }
 
 class MarkerTracker {
     boolean check_ID = false;
 
-    int thresh;     // Threshold: gray to mono
-    int bw_thresh;  // Threshold for gray marker to ID image
+    int thresh;     // Threshold: gray to mono for whole image
+    int bw_thresh;  // Threshold for ID image of gray marker
     double kMarkerSizeLength;
     double kMarkerSizeMin;
     double kMarkerSizeMax;
 
     Mat image_bgr;
-	Mat image_gray;
-	Mat image_gray_filtered;
+  Mat image_gray;
+  Mat image_gray_filtered;
 
-    ArrayList<Marker> marker_list = new ArrayList<Marker>(); // list for detected markers
 
     MarkerTracker(double _kMarkerSizeLength) {
         thresh = 80;
@@ -103,6 +97,14 @@ class MarkerTracker {
         return p;
     }
 
+    PVector[] Parray2Pvector(Point[] p){
+        PVector[] v = new PVector[p.length];
+        for (int i = 0; i < p.length; i++){
+            v[i] = new PVector((float)p[i].x, (float)p[i].y);
+        }
+        return v;
+    }
+
     Point[] get_intersect(Mat[] line){
         Point[] intersections = new Point[kNumOfCorners];
         // get line parameters
@@ -128,49 +130,55 @@ class MarkerTracker {
     }
 
 
-    int get_ID(Marker marker){
-        int ID = (int)1e9;
+    int[] get_ID(Marker marker){
+        int[] result;
+        result = new int[2];
+        result[0] = (int)1e9;
+        result[1] = -1;
         int sec_size = marker.marker_image.rows()/(kNumMarkRange+2);
         Mat image_refine = new Mat(kNumMarkRange, kNumMarkRange, CvType.CV_8UC1);
+        int offset = 10;
 
         // get small marker image
         for (int i = 1; i <= kNumMarkRange; i++){
             for(int j = 1; j <= kNumMarkRange; j++){
-                Mat submat = marker.marker_image.submat(sec_size * j + 10, sec_size * (j+1)-10, sec_size * i+10, sec_size * (i+1)-10);
+                Mat submat = marker.marker_image.submat(sec_size * j + offset, sec_size * (j+1)-offset, sec_size * i+offset, sec_size * (i+1)-offset);
                 double sum = Core.sumElems(submat).val[0];
-                int ave = (int)(sum / (10 * 10));
+                int ave = (int)(sum / (offset * offset));
                 
-                if(ave >= 80){
+                if(ave >= 120){
                     image_refine.put(i-1, j-1, 0);
                 }else{
                     image_refine.put(i-1, j-1, 1);
                 }
             }
         }
-        System.out.println(image_refine.dump());
 
         // calculate ID from eacn direction and select the smallest one
         int base = (int)Math.pow(2, image_refine.rows()); // for convert id
+        int direction = -1;
         
         for (int i = 0; i < 4; i++){
             int id = 0;
             for (int j = 0; j < image_refine.rows(); j++){
                 int row = 0;
                 for (int k = 0; k < image_refine.cols(); k++){
-                    // println(Math.pow(2, image_refine.cols()-1-k));
                     row = row + (int)image_refine.get(j, k)[0] * (int)Math.pow(2, image_refine.cols()-1-k);
                 }
                 id = id + row * (int)Math.pow(base, image_refine.rows()-1-j);
             }
 
-            if(id < ID) ID = id;
+            if(id < result[0]){
+                result[0] = id;
+                result[1] = i;
+            }
             image_refine = rotate_mat(image_refine);
+            
         }
+        if(result[0] == (int)Math.pow(base, kNumMarkRange) - 1) result[0] = 0;
 
-        System.out.println(ID);
 
-
-        return ID;
+        return result;
     }
 
     Mat rotate_mat(Mat mat){
@@ -186,7 +194,9 @@ class MarkerTracker {
 
 
 
-	void findMarker(ArrayList<Marker> markers) {
+  void findMarker(ArrayList<Marker> markers) {
+        markers.clear();
+
         boolean isFirstStripe = true;
         boolean isFirstMarker = true;
 
@@ -201,6 +211,7 @@ class MarkerTracker {
 
         int kCircleSize = 10;
         int line_width = 4;
+        int marker_cnt = 0;
 
 
 
@@ -212,8 +223,16 @@ class MarkerTracker {
         image_gray_filtered = OpenCV.imitate(opencv.getGray());
 
         PImage dst = createImage(image_width, image_height, ARGB);
-        opencv.toPImage(image_gray, dst);
+        opencv.toPImage(image_bgr, dst);
+        
         image(dst, 0, 0);
+        // beginShape();
+        //     texture(dst);
+        //     vertex(0,0,0,0,0);
+        //     vertex(width,0,0,width,0);
+        //     vertex(width,height,0,width,height);
+        //     vertex(0,height,0,0,height);
+        // endShape();
         
 
         // Thresholding and find contour
@@ -248,12 +267,13 @@ class MarkerTracker {
             Point[] p = contour_approx.toArray();
             beginShape();
             for (int i = 0; i < p.length; i++){
-                vertex((float)p[i].x, (float)p[i].y);
+                vertex((float)p[i].x, (float)p[i].y, 0);
             }
             endShape(CLOSE);
 
             int kNumOfEdgepoints = 7;
             Mat[] line_parameters = new Mat[kNumOfCorners];
+            boolean edge_detection = true;
 
             // circles on vertex and edge
             for (int i = 0; i < kNumOfCorners; i++){
@@ -287,13 +307,11 @@ class MarkerTracker {
                     PVector edge_point = PVector.add(pb, PVector.mult(kEdgeDirectionVec, j));
                     stroke(40, 90, 216);
                     strokeWeight(kStripeWidth);
-                    // fill(40, 90, 216);
-                    circle((float)edge_point.x, (float)edge_point.y, (float)line_width);
 
                     line(edge_point.x + (-stripe_length)*kStripeVecY.x,
-                    edge_point.y + (-stripe_length)*kStripeVecY.y,
+                    edge_point.y + (-stripe_length)*kStripeVecY.y, 0,
                     edge_point.x + (stripe_length)*kStripeVecY.x,
-                    edge_point.y + (stripe_length)*kStripeVecY.y);
+                    edge_point.y + (stripe_length)*kStripeVecY.y, 0);
 
                     // generating stripe matrix
                     Mat stripe_image = new Mat(kStripeSize, CvType.CV_8UC1);
@@ -333,6 +351,12 @@ class MarkerTracker {
                         }
                     }
 
+
+                    if(idx_max == -1){
+                        edge_detection = false;
+                        continue;
+                    }
+
                     double pos, y0, y1, y2;
                     y0 = (idx_max <= 0) ? 0: sobel_values[idx_max-1];
                     y1 = sobel_values[idx_max];
@@ -346,6 +370,7 @@ class MarkerTracker {
                     edge_points[j-1] = PVector.add(edge_point, PVector.mult(kStripeVecY, max_idxshift + (float)pos));
 
                 }
+                if(!edge_detection) continue;
 
                 MatOfPoint2f mat = new MatOfPoint2f();
 
@@ -364,17 +389,41 @@ class MarkerTracker {
                 // line((float)(image_width-1), (float)righty, (float)0, (float)lefty);
             }
 
+            if(!edge_detection) continue;
+
             // compute corners as intersections of sides
             Point[] intersections = new Point[kNumOfCorners];
             intersections = get_intersect(line_parameters);
             
-            stroke(200, 0, 0);
-            fill(200, 0, 0);
-            for (int i = 0; i < kNumOfCorners; i++){
-                circle((float)intersections[i].x, (float)intersections[i].y, kCircleSize);
+            if(marker_cnt == 0){
+                for (int i = 0; i < kNumOfCorners; i++){
+                    switch (i) {
+                        case 0:
+                            stroke(200, 0, 0);
+                            fill(200, 0, 0);
+                            circle((float)intersections[i].x, (float)intersections[i].y, kCircleSize);
+                            break;
+                        case 1:
+                            stroke(200, 200, 0);
+                            fill(200, 200, 0);
+                            circle((float)intersections[i].x, (float)intersections[i].y, kCircleSize);
+                            break;
+                        case 2:
+                            stroke(0, 200, 0);
+                            fill(0, 200, 0);
+                            circle((float)intersections[i].x, (float)intersections[i].y, kCircleSize);
+                            break;
+                        case 3:
+                            stroke(0, 200, 200);
+                            fill(0, 200, 200);
+                            circle((float)intersections[i].x, (float)intersections[i].y, kCircleSize);
+                            break;
+                    }
+                }
             }
+            
 
-            // setting src image position for transform
+            // setting src image position, e.g. marker position in the image, for transform
             double src_point[] = new double[2*kNumOfCorners];
             for(int i = 0; i < kNumOfCorners; i++){
                 src_point[2*i] = intersections[i].x;
@@ -385,28 +434,68 @@ class MarkerTracker {
             src_point_mat.put(0, 0, src_point);
 
             // setting dst image position for transform
-            double dst_point[] = new double[]{0, 0, 0, 200, 200, 200, 200, 0};
+            double dst_point[] = new double[]{0, 0, 0, kNumMarkerPxl, kNumMarkerPxl, kNumMarkerPxl, kNumMarkerPxl, 0};
             Mat dst_point_mat = new Mat(4, 2, CvType.CV_32FC1);
             dst_point_mat.put(0, 0, dst_point);
 
-
-            Marker marker = new Marker();
+            // create marker instance for registration, and register its transform matrix and marker image
+            Marker marker = new Marker(); 
             marker.transform = Imgproc.getPerspectiveTransform(src_point_mat, dst_point_mat);
             Imgproc.warpPerspective(image_gray, marker.marker_image, marker.transform, new Size((double)kNumMarkerPxl, (double)kNumMarkerPxl));
             
-            Imgproc.threshold(marker.marker_image, marker.marker_image, bw_thresh, 255.0, Imgproc.THRESH_BINARY);
+            Imgproc.threshold(marker.marker_image, marker.marker_image, bw_thresh, 255.0, Imgproc.THRESH_BINARY); // thresholding marker image
+
+            // PImage dst2 = createImage(kNumMarkerPxl, kNumMarkerPxl, ARGB);
+            // opencv.toPImage(marker.marker_image, dst2);
+            // image(dst2, 0, 0);
 
             // get ID of marker
-            marker.ID = get_ID(marker);
-            marker_list.add(marker);
+            int[] id_and_direction = new int[2];
+            id_and_direction = get_ID(marker);
+            marker.id = id_and_direction[0];
+            if(marker.id == 0) continue;
+
+            Point[] intersections_sub = new Point[intersections.length];
+
+            // correct image and  for consistent marker direction
+            if(id_and_direction[1] != 0){
+                for (int i = 1; i <= id_and_direction[1]; i++){
+                    System.arraycopy(intersections, 0, intersections_sub, 0, intersections.length);
+                    marker.marker_image = rotate_mat(marker.marker_image); // rotate marker image
+
+                    // shift intersections array index for estimateSquarePose
+                    for (int j = 0; j < kNumOfCorners; j++){
+                        intersections[(j+1)%kNumOfCorners] = new Point(intersections_sub[j].x, intersections_sub[j].y);
+                    }
+                }
+            }
+
+            
+            
 
 
+
+            
+            
+            
+
+            // get pose of marker
+            PVector[] intersections_v = Parray2Pvector(intersections);
+            marker.pose = estimateSquarePose(intersections_v, kMarkerSize);
+            
+
+
+
+            markers.add(marker); // register marker
+            marker_cnt = marker_cnt + 1;
+
+            
             
         }
 
 
         
         
-        marker_list.clear();
+        marker_cnt = 0;
     }
 }
